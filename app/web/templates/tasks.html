@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>采集任务</title>
+  <style>
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 2rem; }
+    label { display: block; font-weight: 600; margin-top: .8rem; }
+    input, textarea { box-sizing: border-box; font: inherit; padding: .45rem; width: 100%; }
+    table { border-collapse: collapse; margin-top: 1rem; width: 100%; }
+    th, td { border-bottom: 1px solid #ddd; padding: .6rem; text-align: left; vertical-align: top; }
+    button, .button { background: #1769e0; border: 0; border-radius: 6px; color: white; cursor: pointer; display: inline-block; padding: .45rem .75rem; text-decoration: none; }
+    .secondary { background: #555; }
+    .panel { border: 1px solid #ddd; border-radius: 8px; margin: 1rem 0 2rem; padding: 1rem; }
+    .hint { color: #666; font-size: .9rem; }
+    .message { background: #edf8ed; border: 1px solid #a6d9a6; border-radius: 6px; padding: .7rem; }
+    .error { background: #fff0f0; border: 1px solid #e3a1a1; border-radius: 6px; padding: .7rem; }
+    .actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+  <h1>采集任务</h1>
+  <p>当前仅支持幸福里公开页面。建议先在浏览器复制幸福里搜索结果页 URL，再创建任务。</p>
+
+  {% if message %}<p class="message">{{ message }}</p>{% endif %}
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+  <div class="panel">
+    <h2>新建幸福里任务</h2>
+    <form method="post" action="/tasks">
+      <label for="name">任务名称</label>
+      <input id="name" name="name" placeholder="例如：福州" required>
+
+      <label for="city">城市代码</label>
+      <input id="city" name="city" value="fz" placeholder="例如：fz、bj" required>
+
+      <label for="district">区域</label>
+      <input id="district" name="district" placeholder="可选，例如：鼓楼">
+
+      <label for="keyword">关键词</label>
+      <input id="keyword" name="keyword" placeholder="可选，例如：鼓楼">
+
+      <label for="xingfuli_url">幸福里搜索页 URL</label>
+      <textarea id="xingfuli_url" name="xingfuli_url" rows="3" placeholder="推荐填写：从浏览器复制的 https://m.xflapp.com/ershoufang/..."></textarea>
+      <p class="hint">如果填写完整 URL，将优先使用该 URL 发起采集。</p>
+
+      <label for="filter_params_url">filter_params_url</label>
+      <textarea id="filter_params_url" name="filter_params_url" rows="2" placeholder="可选，例如：neighborhood_id[]=6631320275243761933"></textarea>
+      <p class="hint">如果没有完整 URL，可填写幸福里 URL 中的 filter_params_url 参数。</p>
+
+      <label for="frequency_minutes">采集间隔（分钟）</label>
+      <input id="frequency_minutes" name="frequency_minutes" type="number" min="1" value="360">
+
+      <label><input name="enabled" type="checkbox" checked style="width:auto"> 启用定时采集</label>
+
+      <p><button type="submit">创建任务</button></p>
+    </form>
+  </div>
+
+  <h2>任务列表</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>名称</th>
+        <th>城市/关键词</th>
+        <th>启用</th>
+        <th>上次运行</th>
+        <th>下次运行</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for task in tasks %}
+        <tr>
+          <td>{{ task.id }}</td>
+          <td>{{ task.name }}</td>
+          <td>{{ task.city }}{% if task.keyword %} / {{ task.keyword }}{% endif %}</td>
+          <td>{{ "是" if task.enabled else "否" }}</td>
+          <td>{{ task.last_run_at or "未运行" }}</td>
+          <td>{{ task.next_run_at or "" }}</td>
+          <td>
+            <div class="actions">
+              <form method="post" action="/tasks/{{ task.id }}/run">
+                <button type="submit">立即采集</button>
+              </form>
+              <a class="button secondary" href="/tasks/{{ task.id }}/edit">编辑</a>
+              <a class="button secondary" href="/listings?source={{ task.source|urlencode }}&city={{ task.city|urlencode }}{% if task.keyword %}&keyword={{ task.keyword|urlencode }}{% endif %}">查看房源</a>
+            </div>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7">暂无任务</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <p><a href="/">返回看板</a> · <a href="/listings">查看全部房源</a></p>
+</body>
+</html>

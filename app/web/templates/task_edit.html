@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>编辑采集任务</title>
+  <style>
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 2rem; }
+    label { display: block; font-weight: 600; margin-top: .8rem; }
+    input, textarea { box-sizing: border-box; font: inherit; padding: .45rem; width: 100%; }
+    button, .button { background: #1769e0; border: 0; border-radius: 6px; color: white; cursor: pointer; display: inline-block; padding: .45rem .75rem; text-decoration: none; }
+    .secondary { background: #555; }
+    .panel { border: 1px solid #ddd; border-radius: 8px; margin: 1rem 0 2rem; padding: 1rem; }
+    .hint { color: #666; font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <h1>编辑采集任务</h1>
+  <p>当前仅支持幸福里公开页面。</p>
+
+  <div class="panel">
+    <form method="post" action="/tasks/{{ task.id }}/edit">
+      <label for="name">任务名称</label>
+      <input id="name" name="name" value="{{ task.name }}" required>
+
+      <label for="city">城市代码</label>
+      <input id="city" name="city" value="{{ task.city }}" required>
+
+      <label for="district">区域</label>
+      <input id="district" name="district" value="{{ task.district or '' }}">
+
+      <label for="keyword">关键词</label>
+      <input id="keyword" name="keyword" value="{{ task.keyword or '' }}">
+
+      <label for="xingfuli_url">幸福里搜索页 URL</label>
+      <textarea id="xingfuli_url" name="xingfuli_url" rows="3">{{ xingfuli_url }}</textarea>
+      <p class="hint">如果填写完整 URL，将优先使用该 URL 发起采集。</p>
+
+      <label for="filter_params_url">filter_params_url</label>
+      <textarea id="filter_params_url" name="filter_params_url" rows="2">{{ filter_params_url }}</textarea>
+      <p class="hint">如果没有完整 URL，可填写幸福里 URL 中的 filter_params_url 参数。</p>
+
+      <label for="frequency_minutes">采集间隔（分钟）</label>
+      <input id="frequency_minutes" name="frequency_minutes" type="number" min="1" value="{{ task.frequency_minutes }}">
+
+      <label><input name="enabled" type="checkbox" {% if task.enabled %}checked{% endif %} style="width:auto"> 启用定时采集</label>
+
+      <p>
+        <button type="submit">保存修改</button>
+        <a class="button secondary" href="/tasks">取消</a>
+      </p>
+    </form>
+  </div>
+</body>
+</html>
+
