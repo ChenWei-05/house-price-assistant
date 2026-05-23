@@ -7,29 +7,61 @@
     body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 2rem; }
     table { border-collapse: collapse; width: 100%; }
     th, td { border-bottom: 1px solid #ddd; padding: .6rem; text-align: left; }
+    th a { color: inherit; text-decoration: none; }
+    .filter-form { align-items: end; display: flex; gap: .5rem; margin: 1rem 0; }
+    .filter-form label { display: block; font-weight: 600; margin-bottom: .25rem; }
+    .filter-form input { box-sizing: border-box; font: inherit; padding: .45rem; width: 16rem; }
+    button, .button { background: #1769e0; border: 0; border-radius: 6px; color: white; cursor: pointer; display: inline-block; padding: .45rem .75rem; text-decoration: none; }
+    .secondary { background: #555; }
+    .sort-indicator { color: #1769e0; font-size: .85rem; margin-left: .25rem; }
   </style>
 </head>
 <body>
   <h1>房源列表</h1>
   <p>
     <a href="/">返回看板</a> · <a href="/tasks">管理采集任务</a>
-    {% if filters.source or filters.city or filters.keyword or filters.status %}
+    {% if filters.source or filters.city or filters.community or filters.keyword or filters.status %}
       · 当前筛选：
       {% if filters.source %}来源={{ filters.source }} {% endif %}
       {% if filters.city %}城市={{ filters.city }} {% endif %}
       {% if filters.keyword %}关键词={{ filters.keyword }} {% endif %}
       {% if filters.status %}状态={{ filters.status }} {% endif %}
+      {% if filters.community %}小区={{ filters.community }} {% endif %}
     {% endif %}
   </p>
+  <form class="filter-form" method="get" action="/listings">
+    {% if filters.source %}<input type="hidden" name="source" value="{{ filters.source }}">{% endif %}
+    {% if filters.city %}<input type="hidden" name="city" value="{{ filters.city }}">{% endif %}
+    {% if filters.district %}<input type="hidden" name="district" value="{{ filters.district }}">{% endif %}
+    {% if filters.keyword %}<input type="hidden" name="keyword" value="{{ filters.keyword }}">{% endif %}
+    {% if filters.status %}<input type="hidden" name="status" value="{{ filters.status }}">{% endif %}
+    {% if filters.sort_by %}<input type="hidden" name="sort_by" value="{{ filters.sort_by }}">{% endif %}
+    {% if filters.sort_dir %}<input type="hidden" name="sort_dir" value="{{ filters.sort_dir }}">{% endif %}
+    <div>
+      <label for="community">小区名称</label>
+      <input id="community" name="community" value="{{ filters.community or '' }}" placeholder="输入小区名称">
+    </div>
+    <button type="submit">筛选</button>
+    <a class="button secondary" href="/listings">清空</a>
+  </form>
   <table>
     <thead>
       <tr>
         <th>标题</th>
         <th>小区</th>
         <th>户型</th>
-        <th>面积</th>
-        <th>总价</th>
-        <th>单价</th>
+        <th>
+          <a href="{{ sort_links.area }}">面积</a>
+          {% if filters.sort_by == "area" %}<span class="sort-indicator">{{ "↑" if filters.sort_dir == "asc" else "↓" }}</span>{% endif %}
+        </th>
+        <th>
+          <a href="{{ sort_links.total_price }}">总价</a>
+          {% if filters.sort_by == "total_price" %}<span class="sort-indicator">{{ "↑" if filters.sort_dir == "asc" else "↓" }}</span>{% endif %}
+        </th>
+        <th>
+          <a href="{{ sort_links.unit_price }}">单价</a>
+          {% if filters.sort_by == "unit_price" %}<span class="sort-indicator">{{ "↑" if filters.sort_dir == "asc" else "↓" }}</span>{% endif %}
+        </th>
         <th>状态</th>
         <th>最近发现</th>
       </tr>

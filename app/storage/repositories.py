@@ -4,7 +4,7 @@ import datetime as dt
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import Select, and_, desc, func, select
+from sqlalchemy import Select, and_, asc, desc, func, select
 from sqlalchemy.orm import Session
 
 from app.crawler.base import CrawledListing
@@ -61,7 +61,7 @@ class ListingRepository:
     def list(self, filters: dict[str, Any], page: int = 1, page_size: int = 50) -> list[Listing]:
         statement = select(Listing)
         statement = self._apply_filters(statement, filters)
-        statement = statement.order_by(desc(Listing.last_seen_at))
+        statement = self._apply_sort(statement, filters)
         statement = statement.offset(max(page - 1, 0) * page_size).limit(page_size)
         return list(self.db.scalars(statement))
 
@@ -269,6 +269,21 @@ class ListingRepository:
         if filters.get("layout"):
             statement = statement.where(Listing.layout == filters["layout"])
         return statement
+
+    def _apply_sort(self, statement: Select[tuple[Listing]], filters: dict[str, Any]) -> Select[tuple[Listing]]:
+        sort_columns = {
+            "area": Listing.area,
+            "total_price": Listing.current_total_price,
+            "unit_price": Listing.current_unit_price,
+        }
+        sort_by = filters.get("sort_by")
+        sort_dir = filters.get("sort_dir")
+        sort_column = sort_columns.get(sort_by)
+        if sort_column is None:
+            return statement.order_by(desc(Listing.last_seen_at))
+
+        order_function = asc if sort_dir == "asc" else desc
+        return statement.order_by(order_function(sort_column), desc(Listing.last_seen_at))
 
 
 class CrawlRunRepository:

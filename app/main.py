@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
@@ -9,6 +10,10 @@ from app.api import dashboard, events, listings, tasks
 from app.scheduler.jobs import build_scheduler
 from app.storage.database import init_db
 from app.web import routes as web_routes
+
+
+logging.basicConfig(level=logging.INFO)
+logging.getLogger("app").setLevel(logging.INFO)
 
 
 @asynccontextmanager
@@ -35,4 +40,3 @@ app.include_router(web_routes.router)
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
-

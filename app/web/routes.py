@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import logging
 import urllib.parse
 
 from fastapi import APIRouter, Depends, Request
@@ -11,6 +12,9 @@ from sqlalchemy.orm import Session
 from app.storage.database import get_session
 from app.storage.repositories import CrawlTaskRepository, ListingRepository
 from app.services.crawl_service import CrawlService
+
+
+logger = logging.getLogger(__name__)
 
 
 router = APIRouter(tags=["web"])
@@ -105,12 +109,28 @@ async def update_task(task_id: int, request: Request, db: Session = Depends(get_
 
 
 @router.post("/tasks/{task_id}/run")
-def run_task(task_id: int, db: Session = Depends(get_session)):
+def run_task(task_id: int, request: Request, db: Session = Depends(get_session)):
+    logger.info(
+        "Web immediate crawl action received task_id=%s method=%s path=%s client=%s",
+        task_id,
+        request.method,
+        request.url.path,
+        request.client.host if request.client else None,
+    )
     try:
         run = CrawlService(db).run_task(task_id)
     except ValueError as exc:
+        logger.exception("Web immediate crawl action rejected task_id=%s", task_id)
         return _redirect_tasks(error=str(exc))
 
+    logger.info(
+        "Web immediate crawl action completed task_id=%s run_id=%s status=%s stats=%s error=%s",
+        task_id,
+        run.id,
+        run.status,
+        run.stats_json,
+        run.error_message,
+    )
     if run.status == "failed":
         return _redirect_tasks(error=f"采集失败：{run.error_message or '未知错误'}")
     stats = run.stats_json
@@ -127,6 +147,8 @@ def run_task(task_id: int, db: Session = Depends(get_session)):
 @router.get("/listings")
 def listings(request: Request, db: Session = Depends(get_session)):
     repository = ListingRepository(db)
+    sort_by = _normalize_listing_sort_by(request.query_params.get("sort_by"))
+    sort_dir = _normalize_sort_dir(request.query_params.get("sort_dir"))
     filters = {
         "source": request.query_params.get("source"),
         "city": request.query_params.get("city"),
@@ -134,6 +156,8 @@ def listings(request: Request, db: Session = Depends(get_session)):
         "community": request.query_params.get("community"),
         "keyword": request.query_params.get("keyword"),
         "status": request.query_params.get("status"),
+        "sort_by": sort_by,
+        "sort_dir": sort_dir,
     }
     return templates.TemplateResponse(
         "listings.html",
@@ -141,6 +165,10 @@ def listings(request: Request, db: Session = Depends(get_session)):
             "request": request,
             "listings": repository.list(filters, page=1, page_size=100),
             "filters": filters,
+            "sort_links": {
+                field: _listing_sort_url(request, field, sort_by, sort_dir)
+                for field in ("area", "total_price", "unit_price")
+            },
         },
     )
 
@@ -168,6 +196,29 @@ def _safe_int(value: str | None, default: int) -> int:
         return int(value)
     except ValueError:
         return default
+
+
+def _normalize_listing_sort_by(value: str | None) -> str | None:
+    if value in {"area", "total_price", "unit_price"}:
+        return value
+    return None
+
+
+def _normalize_sort_dir(value: str | None) -> str:
+    if value == "asc":
+        return "asc"
+    return "desc"
+
+
+def _listing_sort_url(request: Request, field: str, current_sort_by: str | None, current_sort_dir: str) -> str:
+    next_sort_dir = "desc"
+    if current_sort_by == field and current_sort_dir == "desc":
+        next_sort_dir = "asc"
+
+    params = dict(request.query_params)
+    params["sort_by"] = field
+    params["sort_dir"] = next_sort_dir
+    return f"{request.url.path}?{urllib.parse.urlencode(params)}"
 
 
 def _redirect_tasks(message: str | None = None, error: str | None = None) -> RedirectResponse:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import logging
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -12,6 +13,9 @@ from app.storage.repositories import CrawlRunRepository, CrawlTaskRepository, Li
 from app.services.listing_matcher import ListingMatcher
 from app.services.price_tracker import PriceTracker
 from app.services.status_detector import StatusDetector
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -46,11 +50,38 @@ class CrawlService:
         if task.source not in crawler_registry:
             raise ValueError(f"暂不支持的数据源：{task.source}")
 
+        crawler = crawler_registry[task.source]
         started_at = utc_now()
         stats = CrawlStats()
+        request_url: str | None = None
         try:
-            crawled_listings = crawler_registry[task.source].fetch(task)
+            logger.info(
+                "Crawl task starting task_id=%s source=%s city=%s district=%s keyword=%s",
+                task.id,
+                task.source,
+                task.city,
+                task.district,
+                task.keyword,
+            )
+            build_url = getattr(crawler, "build_url", None)
+            if callable(build_url):
+                request_url = build_url(task)
+                logger.info(
+                    "Crawl task built request url=%s task_id=%s source=%s",
+                    request_url,
+                    task.id,
+                    task.source,
+                )
+
+            crawled_listings = crawler.fetch(task)
             stats.total_fetched = len(crawled_listings)
+            logger.info(
+                "Crawl task fetched task_id=%s source=%s request_url=%s total_fetched=%s",
+                task.id,
+                task.source,
+                request_url,
+                stats.total_fetched,
+            )
             seen_listing_ids = self._persist_listings(task, crawled_listings, stats, started_at)
             stats.removed_count = self.status_detector.mark_missing(
                 self.listings,
@@ -70,8 +101,22 @@ class CrawlService:
             )
             self.db.commit()
             self.db.refresh(run)
+            logger.info(
+                "Crawl task succeeded task_id=%s run_id=%s source=%s request_url=%s stats=%s",
+                task.id,
+                run.id,
+                task.source,
+                request_url,
+                asdict(stats),
+            )
             return run
         except Exception as exc:
+            logger.exception(
+                "Crawl task failed task_id=%s source=%s request_url=%s",
+                task.id,
+                task.source,
+                request_url,
+            )
             self.db.rollback()
             finished_at = utc_now()
             run = self.runs.create(
@@ -147,4 +192,3 @@ class CrawlService:
     def _update_task_schedule(self, task: CrawlTask, finished_at: dt.datetime) -> None:
         task.last_run_at = finished_at
         task.next_run_at = finished_at + dt.timedelta(minutes=task.frequency_minutes)
-
